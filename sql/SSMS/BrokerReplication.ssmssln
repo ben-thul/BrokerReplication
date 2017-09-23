@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# SQL Server Management Studio Solution File, Format Version 14.00
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Queries", "Queries", "{9F468B6A-611E-4162-90E9-C9A8B4616856}"
+	ProjectSection(SolutionItems) = preProject
+		..\all\01-CreateDatabase.sql = ..\all\01-CreateDatabase.sql
+		..\all\02-CreateBrokerObjects.sql = ..\all\02-CreateBrokerObjects.sql
+		..\pub\03-CreateCustomPublisherObjects.sql = ..\pub\03-CreateCustomPublisherObjects.sql
+		..\pub\04-CreatePublisherTriggers.sql = ..\pub\04-CreatePublisherTriggers.sql
+		..\sub\05-CreateSubscriberObjects.sql = ..\sub\05-CreateSubscriberObjects.sql
+		..\sub\06-DropForeignKeys.sql = ..\sub\06-DropForeignKeys.sql
+		..\demo\07-Invoices-Update.sql = ..\demo\07-Invoices-Update.sql
+		..\demo\08-Invoices-Delete.sql = ..\demo\08-Invoices-Delete.sql
+		..\demo\09-Invoices-Delete.sql = ..\demo\09-Invoices-Delete.sql
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Default|Default = Default|Default
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1EFE1549-35D9-4F6C-9216-71BD8682AB3F}.Default|Default.ActiveCfg = Default
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
