@@ -222,6 +222,17 @@ CREATE PROCEDURE [repl].[SendMessage] (
 AS
 BEGIN
 
+    DECLARE @broker_guid UNIQUEIDENTIFIER = (
+        SELECT [service_broker_guid]
+        FROM [sys].[databases]
+        WHERE [database_id] = DB_ID()
+    );
+
+    SET @message.modify('    
+        insert attribute PublisherID {sql:variable("@broker_guid")}
+        into (/*)[1]
+    ');
+
     DECLARE 
         @ch_01 UNIQUEIDENTIFIER,
         @ch_02 UNIQUEIDENTIFIER,
@@ -322,3 +333,47 @@ EXEC [repl].[addStoredConversationGroup]
     @ContractName = 'DeleteContract' ,
     @count = 5;
 GO
+
+EXEC [repl].[addStoredConversationGroup] 
+    @ContractName = 'SchemaSync' ,
+    @count = 1;
+GO
+
+CREATE TABLE [repl].[PublishedTables] (
+    [ObjectName] sysname NOT NULL
+    CONSTRAINT [PK_PublishedTables] PRIMARY KEY CLUSTERED ([ObjectName])
+);
+
+INSERT INTO [repl].[PublishedTables]
+    ([ObjectName])
+VALUES 
+    ('Sales.Invoices'),
+    ('Sales.Orders');
+GO
+
+CREATE PROCEDURE [repl].[SendSchemaSyncMessage]
+AS
+BEGIN
+    
+    DECLARE @message XML = (
+        SELECT [pt].[ObjectName] AS [@name],
+         (
+            SELECT c.[column_id] AS [@id], 
+            c.[name] AS [@name]
+            FROM sys.[columns] AS [c]
+            WHERE c.[object_id] = OBJECT_ID(pt.[ObjectName])
+            FOR XML PATH('Column'), ROOT('Columns'), TYPE
+         )
+        FROM repl.[PublishedTables] AS [pt]
+        FOR XML PATH('Table'), ROOT('Tables')
+    );
+
+    EXEC [repl].[SendMessage] 
+        @ContractName = 'SchemaSync' ,
+        @MessageType = 'SchemaSync' ,
+        @message = @message
+
+END
+GO
+
+EXEC [repl].[SendSchemaSyncMessage];

@@ -31,6 +31,8 @@ CREATE CONTRACT [DeleteContract] (
     [OrderDelete] SENT BY INITIATOR
 );
 
+CREATE MESSAGE TYPE [SchemaSync] VALIDATION = NONE;
+CREATE CONTRACT [SchemaSync] ([SchemaSync] SENT BY INITIATOR);
 
 CREATE QUEUE [repl].[ReplicationQueue];
 CREATE SERVICE [ReplicationService]
@@ -38,7 +40,8 @@ CREATE SERVICE [ReplicationService]
     ON QUEUE [repl].[ReplicationQueue] (
         [InsertContract],
         [UpdateContract],
-        [DeleteContract]
+        [DeleteContract],
+        [SchemaSync]
     );
 
 DROP ROUTE [AutoCreatedLocal];

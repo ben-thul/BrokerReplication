@@ -38,7 +38,18 @@ BEGIN
 END
 GO
 
-CREATE FUNCTION repl.[columnNamesFromUpdateMask](
+CREATE TABLE [repl].[SubscribedColumns] (
+    PublisherID UNIQUEIDENTIFIER NOT NULL,
+    ObjectName sysname NOT NULL,
+    ColumnName sysname NOT NULL,
+    ColumnID INT NOT NULL,
+    CONSTRAINT [PK_SubscribedColumns] PRIMARY KEY CLUSTERED ([PublisherID], [ObjectName], [ColumnName])
+)
+
+GO
+
+CREATE FUNCTION [repl].[columnNamesFromUpdateMask](
+    @PublisherID UNIQUEIDENTIFIER,
     @tablename sysname, 
     @updateMask varbinary(16)
 )
@@ -62,17 +73,18 @@ RETURN
 		(
             -- return columns belonging to table @tablename, 
             -- calculate appropriate bit masks
-			select column_id, 
-				[name], 
+			select [sc].[ColumnID], 
+				[sc].[ColumnName], 
 				ByteNumber, 
 				ByteValue,
-				power(2, (((a.column_id - 1 ) % 8) + 1) - 1) as BitMask
-			from sys.columns a 
+				power(2, ((([sc].[ColumnID] - 1 ) % 8) + 1) - 1) as BitMask
+			from [repl].[SubscribedColumns] as [sc]
 			join column_updated_bytesCTE as b
-				on ((a.column_id - 1) / 8) + 1 = b.ByteNumber
-			where a.object_id = object_id(@tablename)
+				on (([sc].[ColumnID] - 1) / 8) + 1 = b.ByteNumber
+			WHERE [sc].[PublisherID] = @PublisherID
+                AND [sc].[ObjectName] = @tablename
 		) 
-		select column_id, name		
+		select [ColumnID], [ColumnName]		
 		from columnsCTE
 		where ByteValue & BitMask > 0
 GO
@@ -86,7 +98,8 @@ BEGIN
 
     DECLARE @v TINYINT = @message.value('(/Invoices/@v)[1]', 'tinyint'),
         @update_mask varbinary(16) = @message.value('(/Invoices/@__mask__)[1]', 'varbinary(16)'),
-        @operation CHAR(1) = @message.value('(/Invoices/@__operation__)[1]', 'char(1)');
+        @operation CHAR(1) = @message.value('(/Invoices/@__operation__)[1]', 'char(1)'),
+        @PublisherID UNIQUEIDENTIFIER = @message.value('(/Invoices/@PublisherID)[1]', 'UNIQUEIDENTIFIER');
 
     CREATE TABLE [#Invoices](
 	    [InvoiceID] [int] NOT NULL,
@@ -222,12 +235,12 @@ BEGIN
                        [LastEditedBy] ,
                        [LastEditedWhen]
 	            from (
-		            select Name
-		            from repl.columnNamesFromUpdateMask('Sales.Invoices', @update_mask)
+		            select [ColumnName]
+		            from repl.columnNamesFromUpdateMask(@PublisherID, 'Sales.Invoices', @update_mask)
 	            ) as p
 	            pivot (
-		            count([Name])
-		            for [Name] in (
+		            count([ColumnName])
+		            for [ColumnName] in (
                        [InvoiceID] ,
                        [CustomerID] ,
                        [BillToCustomerID] ,
@@ -363,7 +376,8 @@ BEGIN
 
     DECLARE @v TINYINT = @message.value('(/Orders/@v)[1]', 'tinyint'),
         @update_mask varbinary(16) = @message.value('(/Orders/@__mask__)[1]', 'varbinary(16)'),
-        @operation CHAR(1) = @message.value('(/Orders/@__operation__)[1]', 'char(1)');
+        @operation CHAR(1) = @message.value('(/Orders/@__operation__)[1]', 'char(1)'),
+        @PublisherID UNIQUEIDENTIFIER = @message.value('(/Invoices/@PublisherID)[1]', 'UNIQUEIDENTIFIER');
 
     CREATE TABLE [#Orders](
 	    [OrderID] [int] NOT NULL,
@@ -464,12 +478,12 @@ BEGIN
                        [LastEditedBy] ,
                        [LastEditedWhen]
 	            from (
-		            select Name
-		            from repl.columnNamesFromUpdateMask('Sales.Orders', @update_mask)
+		            select [ColumnName]
+		            from repl.columnNamesFromUpdateMask(@PublisherID, 'Sales.Orders', @update_mask)
 	            ) as p
 	            pivot (
-		            count([Name])
-		            for [Name] in (
+		            count([ColumnName])
+		            for [ColumnName] in (
                        [OrderID] ,
                        [CustomerID] ,
                        [SalespersonPersonID] ,
@@ -569,6 +583,45 @@ BEGIN
 END
 GO
 
+CREATE PROCEDURE [repl].[ProcessSchemaSyncMessage](
+    @message XML
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @PublisherID UNIQUEIDENTIFIER = (
+        SELECT @message.value('(/Tables/@PublisherID)[1]', 'uniqueidentifier')
+    );
+    BEGIN TRY
+    
+        BEGIN TRANSACTION;
+            DELETE [repl].[SubscribedColumns]
+            WHERE [PublisherID] = @PublisherID;
+
+            INSERT INTO [repl].[SubscribedColumns]
+            (
+                [PublisherID] ,
+                [ObjectName] ,
+                [ColumnName] ,
+                [ColumnID]
+            )
+        
+            SELECT @PublisherID,
+                tn.value('(./@name)[1]', 'sysname'),
+                cn.value('(./@name)[1]', 'sysname'),
+                cn.value('(./@id)[1]', 'int')
+            FROM @message.nodes('Tables/Table') AS t(tn)
+            CROSS APPLY tn.nodes('Columns/Column') AS c(cn);
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF (XACT_STATE() = -1)
+            ROLLBACK;
+    END CATCH
+END
+GO
+
 CREATE PROCEDURE [repl].[SubscriberActivation]
 AS
 BEGIN
@@ -621,7 +674,11 @@ BEGIN
                     ELSE IF (@message_type IN ('OrderInsert', 'OrderUpdate', 'OrderDelete'))
                     BEGIN
                         EXEC @rc = [repl].[ProcessOrderMessage] @message = @message;
-                    END 
+                    END
+                    ELSE IF (@message_type = 'SchemaSync')
+                    BEGIN
+                        EXEC @rc = [repl].[ProcessSchemaSyncMessage] @message = @message;
+                    END
 
                     IF (@rc <> 0)
                     BEGIN
