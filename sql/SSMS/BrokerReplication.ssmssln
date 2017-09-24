@@ -13,7 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Queries", "Queries", "{9F46
 		..\sub\06-DropForeignKeys.sql = ..\sub\06-DropForeignKeys.sql
 		..\demo\07-Invoices-Update.sql = ..\demo\07-Invoices-Update.sql
 		..\demo\08-Invoices-Delete.sql = ..\demo\08-Invoices-Delete.sql
-		..\demo\09-Invoices-Delete.sql = ..\demo\09-Invoices-Delete.sql
+		..\demo\09-Invoices-Insert.sql = ..\demo\09-Invoices-Insert.sql
 	EndProjectSection
 EndProject
 Global
@@ -21,7 +21,7 @@ Global
 		Default|Default = Default|Default
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1EFE1549-35D9-4F6C-9216-71BD8682AB3F}.Default|Default.ActiveCfg = Default
+		{DB9E13DF-3DD5-41C2-A96C-BD5A49E29933}.Default|Default.ActiveCfg = Default
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
